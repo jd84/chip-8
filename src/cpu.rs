@@ -98,7 +98,7 @@ impl Cpu {
     /// Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
     fn add_xy(&mut self, x: u8, y: u8) {
         if self.registers[x as usize] > (0xFF - self.registers[y as usize]) {
-            self.registers[0xF] = 1;
+            self.registers[0xF] = 1; // carry
         } else {
             self.registers[0xF] = 0;
             self.registers[x as usize] += self.registers[y as usize];
@@ -107,10 +107,10 @@ impl Cpu {
 
     /// VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
     fn sub_xy(&mut self, x: u8, y: u8) {
-        if self.registers[x as usize] < (0x00 + self.registers[y as usize]) {
-            self.registers[0xF] = 1;
+        if self.registers[x as usize] < self.registers[y as usize] {
+            self.registers[0xF] = 0; // borrow
         } else {
-            self.registers[0xF] = 0;
+            self.registers[0xF] = 1;
             self.registers[x as usize] -= self.registers[y as usize];
         }
     }
@@ -156,7 +156,7 @@ mod tests {
         cpu.run();
 
         assert_eq!(4, cpu.registers[0x0]);
-        assert_eq!(0, cpu.registers[0xF]);
+        assert_eq!(1, cpu.registers[0xF]);
         cpu.reset();
 
         cpu.registers[0x0] = 0;
@@ -166,7 +166,7 @@ mod tests {
         cpu.memory[0x001] = 0x15;
         cpu.run();
 
-        assert_eq!(1, cpu.registers[0xF]);
+        assert_eq!(0, cpu.registers[0xF]);
     }
 
     #[test]
