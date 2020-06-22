@@ -48,6 +48,9 @@ impl Cpu {
                 0x2000..=0x2FFF => self.call(addr),
                 0x8000..=0x8FFF => match op_minor {
                     0x0 => self.assign(x, y),
+                    0x1 => self.or_xy(x, y),
+                    0x2 => self.and_xy(x, y),
+                    0x3 => self.xor_xy(x, y),
                     0x4 => self.add_xy(x, y),
                     0x5 => self.sub_xy(x, y),
                     _ => unimplemented!("opcode {:04x}", opcode),
@@ -91,11 +94,31 @@ impl Cpu {
     }
 
     /// Sets Vx to the value of Vy
+    /// 0x8XY0
     fn assign(&mut self, x: u8, y: u8) {
         self.registers[x as usize] = self.registers[y as usize];
     }
 
+    /// Sets VX to VX or VY. (Bitwise OR operation)
+    /// 0x8XY1
+    fn or_xy(&mut self, x: u8, y: u8) {
+        self.registers[x as usize] |= self.registers[y as usize];
+    }
+
+    /// Sets VX to VX and VY. (Bitwise AND operation)
+    /// 0x8XY2
+    fn and_xy(&mut self, x: u8, y: u8) {
+        self.registers[x as usize] &= self.registers[y as usize];
+    }
+
+    /// Sets VX to VX xor VY.
+    /// 0x8XY3
+    fn xor_xy(&mut self, x: u8, y: u8) {
+        self.registers[x as usize] ^= self.registers[y as usize];
+    }
+
     /// Adds VY to VX. VF is set to 1 when there's a carry, and to 0 when there isn't.
+    /// 0x8XY4
     fn add_xy(&mut self, x: u8, y: u8) {
         if self.registers[x as usize] > (0xFF - self.registers[y as usize]) {
             self.registers[0xF] = 1; // carry
@@ -106,6 +129,7 @@ impl Cpu {
     }
 
     /// VY is subtracted from VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+    /// 0x8XY5
     fn sub_xy(&mut self, x: u8, y: u8) {
         if self.registers[x as usize] < self.registers[y as usize] {
             self.registers[0xF] = 0; // borrow
@@ -181,6 +205,45 @@ mod tests {
         cpu.run();
 
         assert_eq!(10, cpu.registers[0x0]);
+    }
+
+    #[test]
+    fn test_or_xy() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 0b1100;
+        cpu.registers[0x1] = 0b0011;
+
+        cpu.memory[0x0] = 0x80;
+        cpu.memory[0x1] = 0x11;
+        cpu.run();
+
+        assert_eq!(0b1111, cpu.registers[0x0]);
+    }
+
+    #[test]
+    fn test_and_xy() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 0xFF;
+        cpu.registers[0x1] = 0x0F;
+
+        cpu.memory[0x0] = 0x80;
+        cpu.memory[0x1] = 0x12;
+        cpu.run();
+
+        assert_eq!(0x0F, cpu.registers[0x0]);
+    }
+
+    #[test]
+    fn test_xor_xy() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 0x11;
+        cpu.registers[0x1] = 0xFF;
+
+        cpu.memory[0x0] = 0x80;
+        cpu.memory[0x1] = 0x13;
+        cpu.run();
+
+        assert_eq!(0xEE, cpu.registers[0x0]);
     }
 
     #[test]
