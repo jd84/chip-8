@@ -54,6 +54,8 @@ impl Cpu {
                     0x4 => self.add_xy(x, y),
                     0x5 => self.sub_xy(x, y),
                     0x6 => self.shift_right_1(x),
+                    0x7 => self.set_sub_xy(x, y),
+                    0xE => self.shift_right_1(x),
                     _ => unimplemented!("opcode {:04x}", opcode),
                 },
                 _ => unimplemented!("opcode {:04x}", opcode),
@@ -145,6 +147,24 @@ impl Cpu {
     fn shift_right_1(&mut self, x: u8) {
         self.registers[0xF] = self.registers[x as usize] & 0x1;
         self.registers[x as usize] >>= 1;
+    }
+
+    /// Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't.
+    /// 0x8XY7
+    fn set_sub_xy(&mut self, x: u8, y: u8) {
+        if self.registers[x as usize] > self.registers[y as usize] {
+            self.registers[0xF] = 0; // borrow
+        } else {
+            self.registers[0xF] = 1;
+            self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize];
+        }
+    }
+
+    /// Stores the most significant bit of VX in VF and then shifts VX to the left by 1.
+    /// 0x8XYE
+    fn shift_left_1(&mut self, x: u8) {
+        self.registers[0xF] = self.registers[x as usize] & 0x1;
+        self.registers[x as usize] <<= 1;
     }
 }
 
@@ -264,6 +284,32 @@ mod tests {
         cpu.run();
 
         assert_eq!(0b0001, cpu.registers[0xF]);
+    }
+
+    #[test]
+    fn test_set_sub_xy() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 6;
+        cpu.registers[0x1] = 10;
+
+        cpu.memory[0x0] = 0x80;
+        cpu.memory[0x1] = 0x17;
+        cpu.run();
+
+        assert_eq!(4, cpu.registers[0x0]);
+    }
+
+    #[test]
+    fn test_shift_left_1() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 0b11;
+
+        cpu.memory[0x0] = 0x80;
+        cpu.memory[0x1] = 0x0E;
+        cpu.run();
+
+        assert_eq!(0x10, cpu.registers[0x0]);
+        assert_eq!(0b01, cpu.registers[0xF]);
     }
 
     #[test]
