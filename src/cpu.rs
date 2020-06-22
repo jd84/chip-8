@@ -55,7 +55,7 @@ impl Cpu {
                     0x5 => self.sub_xy(x, y),
                     0x6 => self.shift_right_1(x),
                     0x7 => self.set_sub_xy(x, y),
-                    0xE => self.shift_right_1(x),
+                    0xE => self.shift_left_1(x),
                     _ => unimplemented!("opcode {:04x}", opcode),
                 },
                 _ => unimplemented!("opcode {:04x}", opcode),
@@ -145,7 +145,7 @@ impl Cpu {
     /// Stores the least significant bit of VX in VF and then shifts VX to the right by 1.
     /// 0x8XY6
     fn shift_right_1(&mut self, x: u8) {
-        self.registers[0xF] = self.registers[x as usize] & 0x1;
+        self.registers[0xF] = self.registers[x as usize] & 0x1; // extract msb
         self.registers[x as usize] >>= 1;
     }
 
@@ -163,7 +163,7 @@ impl Cpu {
     /// Stores the most significant bit of VX in VF and then shifts VX to the left by 1.
     /// 0x8XYE
     fn shift_left_1(&mut self, x: u8) {
-        self.registers[0xF] = self.registers[x as usize] & 0x1;
+        self.registers[0xF] = self.registers[x as usize] & 0x1; // extract msb
         self.registers[x as usize] <<= 1;
     }
 }
@@ -277,13 +277,14 @@ mod tests {
     #[test]
     fn test_shift_right_1() {
         let mut cpu = Cpu::default();
-        cpu.registers[0x0] = 0x11;
+        cpu.registers[0x0] = 0b11;
 
         cpu.memory[0x0] = 0x80;
         cpu.memory[0x1] = 0x16;
         cpu.run();
 
-        assert_eq!(0b0001, cpu.registers[0xF]);
+        assert_eq!(0x1, cpu.registers[0xF]);
+        assert_eq!(0b01, cpu.registers[0x0]);
     }
 
     #[test]
@@ -308,7 +309,7 @@ mod tests {
         cpu.memory[0x1] = 0x0E;
         cpu.run();
 
-        assert_eq!(0x10, cpu.registers[0x0]);
+        assert_eq!(0b110, cpu.registers[0x0]);
         assert_eq!(0b01, cpu.registers[0xF]);
     }
 
