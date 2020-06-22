@@ -53,6 +53,7 @@ impl Cpu {
                     0x3 => self.xor_xy(x, y),
                     0x4 => self.add_xy(x, y),
                     0x5 => self.sub_xy(x, y),
+                    0x6 => self.shift_right_1(x),
                     _ => unimplemented!("opcode {:04x}", opcode),
                 },
                 _ => unimplemented!("opcode {:04x}", opcode),
@@ -137,6 +138,13 @@ impl Cpu {
             self.registers[0xF] = 1;
             self.registers[x as usize] -= self.registers[y as usize];
         }
+    }
+
+    /// Stores the least significant bit of VX in VF and then shifts VX to the right by 1.
+    /// 0x8XY6
+    fn shift_right_1(&mut self, x: u8) {
+        self.registers[0xF] = self.registers[x as usize] & 0x1;
+        self.registers[x as usize] >>= 1;
     }
 }
 
@@ -244,6 +252,18 @@ mod tests {
         cpu.run();
 
         assert_eq!(0xEE, cpu.registers[0x0]);
+    }
+
+    #[test]
+    fn test_shift_right_1() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 0x11;
+
+        cpu.memory[0x0] = 0x80;
+        cpu.memory[0x1] = 0x16;
+        cpu.run();
+
+        assert_eq!(0b0001, cpu.registers[0xF]);
     }
 
     #[test]
