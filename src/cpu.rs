@@ -50,6 +50,7 @@ impl Cpu {
                 0x2000..=0x2FFF => self.call(addr),
                 0x3000..=0x3FFF => self.skip_if_eq(x, cond),
                 0x4000..=0x4FFF => self.skip_if_not_eq(x, cond),
+                0x5000..=0x5FFF => self.skip_if_xy_eq(x, y),
                 0x8000..=0x8FFF => match op_minor {
                     0x0 => self.assign(x, y),
                     0x1 => self.or_xy(x, y),
@@ -122,6 +123,15 @@ impl Cpu {
     /// 0x4XNN
     fn skip_if_not_eq(&mut self, x: u8, cond: u8) {
         if self.registers[x as usize] != cond {
+            self.position_in_memory += 2;
+        }
+    }
+
+    /// Skips the next instruction if VX equals VY.
+    /// (Usually the next instruction is a jump to skip a code block)
+    /// 0x5XY0
+    fn skip_if_xy_eq(&mut self, x: u8, y: u8) {
+        if self.registers[x as usize] == self.registers[y as usize] {
             self.position_in_memory += 2;
         }
     }
@@ -232,6 +242,22 @@ mod tests {
         cpu.run();
 
         assert_eq!(15, cpu.registers[0x0]);
+    }
+
+    #[test]
+    fn test_skip_if_xy_eq() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 5;
+        cpu.registers[0x1] = 5;
+
+        cpu.memory[0x000] = 0x50;
+        cpu.memory[0x001] = 0x10;
+
+        cpu.memory[0x004] = 0x80;
+        cpu.memory[0x005] = 0x14;
+        cpu.run();
+
+        assert_eq!(10, cpu.registers[0x0]);
     }
 
     #[test]
