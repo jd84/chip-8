@@ -39,13 +39,16 @@ impl Cpu {
             let y = ((opcode & 0x00F0) >> 4) as u8;
             let op_minor = (opcode & 0x000F) as u8;
             let addr = opcode & 0x0FFF;
+            let cond = (opcode & 0x00FF) as u8;
 
             self.position_in_memory += 2;
 
             match opcode {
                 0x0000 => return,
                 0x00EE => self.ret(),
+                0x1000..=0x1FFF => self.jmp(addr),
                 0x2000..=0x2FFF => self.call(addr),
+                0x3000..=0x3FFF => self.skip_eq_cond(x, cond),
                 0x8000..=0x8FFF => match op_minor {
                     0x0 => self.assign(x, y),
                     0x1 => self.or_xy(x, y),
@@ -72,7 +75,14 @@ impl Cpu {
         self.stack_pointer = 0;
     }
 
+    /// Perform a jump
+    /// 0x1NNN
+    fn jmp(&mut self, addr: u16) {
+        self.position_in_memory = addr as usize;
+    }
+
     /// Perform a jump and calls subroutine
+    /// 0x2NNN
     fn call(&mut self, addr: u16) {
         let sp = self.stack_pointer;
         let stack = &mut self.stack;
@@ -87,6 +97,7 @@ impl Cpu {
     }
 
     /// Returns from subroutine
+    /// 0x00EE
     fn ret(&mut self) {
         if self.stack_pointer == 0 {
             panic!("Stack underflow");
@@ -94,6 +105,15 @@ impl Cpu {
 
         self.stack_pointer -= 1;
         self.position_in_memory = self.stack[self.stack_pointer] as usize;
+    }
+
+    /// Skips the next instruction if VX equals NN.
+    /// (Usually the next instruction is a jump to skip a code block)
+    /// 0x3NNN
+    fn skip_eq_cond(&mut self, x: u8, cond: u8) {
+        if self.registers[x as usize] == cond {
+            self.position_in_memory += 2;
+        }
     }
 
     /// Sets Vx to the value of Vy
@@ -171,6 +191,22 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_skip_eq_cond() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 5;
+        cpu.registers[0x1] = 10;
+
+        cpu.memory[0x000] = 0x30;
+        cpu.memory[0x001] = 0x05;
+
+        cpu.memory[0x004] = 0x80;
+        cpu.memory[0x005] = 0x14;
+        cpu.run();
+
+        assert_eq!(15, cpu.registers[0x0]);
+    }
 
     #[test]
     fn test_add_xy() {
@@ -311,6 +347,22 @@ mod tests {
 
         assert_eq!(0b110, cpu.registers[0x0]);
         assert_eq!(0b01, cpu.registers[0xF]);
+    }
+
+    #[test]
+    fn test_jmp() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0x0] = 5;
+        cpu.registers[0x1] = 10;
+
+        cpu.memory[0x000] = 0x11;
+        cpu.memory[0x001] = 0x00;
+
+        cpu.memory[0x100] = 0x80;
+        cpu.memory[0x101] = 0x14;
+        cpu.run();
+
+        assert_eq!(15, cpu.registers[0x0]);
     }
 
     #[test]
